@@ -1,9 +1,8 @@
 use rand::{thread_rng, Rng};
 use std::{
     io::{stdout, Write},
-    process::abort,
     thread::sleep,
-    time,
+    time::Duration,
 };
 use termion::{
     async_stdin, color, cursor, event::Key, input::TermRead, raw::IntoRawMode,
@@ -17,12 +16,13 @@ struct Float {
     x: usize,
     y: usize,
 }
+
 impl Float {
     fn new(area: &[[u64; N]; N]) -> Float {
         let mut rng = thread_rng();
 
         if area.iter().all(|&x| x[0] != 0) {
-            abort()
+            panic!()
         }
 
         let mut x = rng.gen::<usize>() % N;
@@ -32,7 +32,7 @@ impl Float {
 
         Float {
             val: 2u64.pow(rng.gen::<u32>() % 6 + 1),
-            x: x,
+            x,
             y: 0,
         }
     }
@@ -41,6 +41,7 @@ impl Float {
 trait Area {
     fn set(&mut self, float: &Float);
 }
+
 impl Area for [[u64; N]; N] {
     fn set(&mut self, float: &Float) {
         self[float.x][float.y] = float.val;
@@ -81,10 +82,10 @@ type Writer = termion::screen::AlternateScreen<termion::raw::RawTerminal<std::io
 fn draw_number(stdout: &mut Writer, val: u64) {
     match val {
         0 => write!(stdout, "{}", color::Fg(color::White)).unwrap(),
-        2..=4 => write!(stdout, "{}", color::Fg(color::Cyan)).unwrap(),
-        8..=16 => write!(stdout, "{}", color::Fg(color::Blue)).unwrap(),
-        32..=64 => write!(stdout, "{}", color::Fg(color::Yellow)).unwrap(),
-        128..=256 => write!(stdout, "{}", color::Fg(color::Magenta)).unwrap(),
+        2 | 4 => write!(stdout, "{}", color::Fg(color::Cyan)).unwrap(),
+        8 | 16 => write!(stdout, "{}", color::Fg(color::Blue)).unwrap(),
+        32 | 64 => write!(stdout, "{}", color::Fg(color::Yellow)).unwrap(),
+        128 | 256 => write!(stdout, "{}", color::Fg(color::Magenta)).unwrap(),
         _ => write!(stdout, "{}", color::Fg(color::Red)).unwrap(),
     }
     write!(stdout, "{}{:^5}{}", style::Invert, val, style::Reset).unwrap();
@@ -93,21 +94,19 @@ fn draw_number(stdout: &mut Writer, val: u64) {
 fn draw(stdout: &mut Writer, area: &[[u64; N]; N], float: &Float) {
     writeln!(
         stdout,
-        "{}{}SCORE: {:06}{}\r",
+        "{}{}SCORE: {:06}{}",
         cursor::Goto(1, 1),
         color::Fg(color::Cyan),
         area.iter()
             .flat_map(|c| c)
             .collect::<Vec<&u64>>()
             .iter()
-            .fold(0, |mut sum, &x| {
-                sum += x;
-                sum
-            }),
+            .fold(0, |sum, &x| sum + x),
         style::Reset
     )
     .unwrap();
     for y in 0..N {
+        writeln!(stdout, "\r").unwrap();
         for x in 0..N {
             if float.x == x && float.y == y {
                 draw_number(stdout, float.val);
@@ -115,7 +114,6 @@ fn draw(stdout: &mut Writer, area: &[[u64; N]; N], float: &Float) {
                 draw_number(stdout, area[x][y]);
             }
         }
-        writeln!(stdout, "\r").unwrap();
     }
 }
 
@@ -123,9 +121,9 @@ fn main() {
     let mut stdout = AlternateScreen::from(stdout().into_raw_mode().unwrap());
     let mut stdin = async_stdin().keys();
 
-    let mut area = [[0u64; N]; N];
+    let mut area = [[0; N]; N];
     let mut float = Float::new(&area);
-    let mut cnt = 0u64;
+    let mut cnt = 0;
 
     loop {
         draw(&mut stdout, &area, &float);
@@ -163,6 +161,6 @@ fn main() {
         }
 
         cnt += 1;
-        sleep(time::Duration::from_millis(10));
+        sleep(Duration::from_millis(10));
     }
 }
